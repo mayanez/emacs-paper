@@ -1,17 +1,17 @@
-"""Citation Manager CLI
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
+"""Citation Manager CLI
 Usage:
     paper.py search <keywords>
     paper.py file <id>
 
 """
-# -*- coding: utf-8 -*-
-
-from __future__ import unicode_literals
 import sqlite3
-import urllib2
 import yaml
+from urllib.request import unquote
 from docopt import docopt
+from termcolor import colored
 
 class Paper:
 
@@ -24,18 +24,24 @@ class Paper:
 
     def file(self, dId):
         query = "select localUrl from Files where hash = (select hash from DocumentFiles where documentId=%d)"
-        path = self.get_singlet(query % dId)[0].replace('file://', '')
-        path = urllib2.unquote(path)
-        print path
+        result = self.cursor.execute(query % dId).fetchall()
+        path = result[0][0].replace('file://', '')
+        path = unquote(path)
+        print(path)
 
     def search(self, query):
         a_query = "SELECT id, title, localUrl from Documents JOIN DocumentFiles ON Documents.id=DocumentFiles.documentId JOIN Files ON DocumentFiles.hash=Files.hash WHERE title like '%{}%' GROUP BY title".format(query)
         results = self.cursor.execute(a_query).fetchall()
 
+        deduped_set = set()
         for doc in results:
            id = doc[0]
            title = doc[1]
-           print "{:5}: {}".format(id,title)
+           path = unquote(doc[2].replace('file://', ''))
+           if path not in deduped_set:
+               print(colored("{}".format(title), 'blue', attrs=['bold']))
+               print(colored('{}'.format(path), 'magenta'))
+               deduped_set.add(path)
 
 if __name__ == '__main__':
     arguments = docopt(__doc__, version='Paper CLI 0.1')
@@ -44,4 +50,4 @@ if __name__ == '__main__':
     if arguments['search']:
         p.search(arguments['<keywords>'])
     elif arguments['file']:
-        p.file(arguments['<id>'])
+        p.file(int(arguments['<id>']))
